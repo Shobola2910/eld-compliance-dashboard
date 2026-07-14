@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Props {
   provider: "leader" | "factor" | "nexus";
@@ -21,6 +22,7 @@ interface TokenStatus {
 }
 
 export default function TokenAuthTabs({ provider, label }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState<"v1" | "v2">("v2");
   const [token, setToken] = useState("");
   const [status, setStatus] = useState<TokenStatus | null>(null);
@@ -55,6 +57,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
       setToken("");
       const refreshed = await fetch(`/api/tokens/${provider}`).then((r) => r.json());
       setStatus(refreshed);
+      router.refresh();
     } finally {
       setLoading(false);
     }
