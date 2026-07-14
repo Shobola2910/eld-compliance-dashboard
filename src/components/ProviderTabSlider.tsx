@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PROVIDERS, PROVIDER_LABELS } from "@/lib/providers/registry";
 import type { Provider } from "@/lib/providers/types";
 import ProviderIcon from "@/components/ProviderIcon";
@@ -18,7 +18,15 @@ export default function ProviderTabSlider({
   panels: ProviderPanel[];
 }) {
   const [active, setActive] = useState<Provider>(initialProvider);
-  const activeIndex = PROVIDERS.indexOf(active);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = buttonRefs.current[active];
+    if (el) {
+      setIndicatorStyle({ left: el.offsetLeft, width: el.offsetWidth });
+    }
+  }, [active]);
 
   function select(provider: Provider) {
     if (provider === active) return;
@@ -26,20 +34,29 @@ export default function ProviderTabSlider({
     window.history.replaceState(null, "", `/?provider=${provider}`);
   }
 
+  const activePanel = panels.find((p) => p.provider === active);
+
   return (
     <div>
-      <div className="inline-flex rounded-full border border-slate-800 bg-[#0d1117] p-1">
+      <div className="relative inline-flex rounded-full border border-slate-800 bg-[#0d1117] p-1">
+        {indicatorStyle && (
+          <div
+            className="absolute inset-y-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 shadow transition-all duration-300 ease-out"
+            style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+          />
+        )}
         {PROVIDERS.map((provider) => {
           const isActive = provider === active;
           return (
             <button
               key={provider}
               type="button"
+              ref={(el) => {
+                buttonRefs.current[provider] = el;
+              }}
               onClick={() => select(provider)}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold uppercase tracking-wide transition-all duration-300 ${
-                isActive
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow"
-                  : "text-slate-400 hover:text-slate-200"
+              className={`relative z-10 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold uppercase tracking-wide transition-colors duration-300 ${
+                isActive ? "text-white" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <ProviderIcon provider={provider} size="sm" />
@@ -49,18 +66,7 @@ export default function ProviderTabSlider({
         })}
       </div>
 
-      <div className="mt-6 overflow-hidden">
-        <div
-          className="flex transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(-${activeIndex * 100}%)` }}
-        >
-          {panels.map((panel) => (
-            <div key={panel.provider} className="w-full shrink-0">
-              {panel.content}
-            </div>
-          ))}
-        </div>
-      </div>
+      <div className="mt-6">{activePanel?.content}</div>
     </div>
   );
 }
