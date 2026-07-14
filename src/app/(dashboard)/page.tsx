@@ -28,7 +28,7 @@ export default async function DashboardPage({
     <div>
       <ProviderTabs active={provider} />
 
-      <div className="mt-6">
+      <div key={provider} className="mt-6 animate-fade-in">
         {isConnected ? (
           <>
             <h1 className="text-lg font-semibold text-slate-100">{PROVIDER_LABELS[provider]} drivers</h1>

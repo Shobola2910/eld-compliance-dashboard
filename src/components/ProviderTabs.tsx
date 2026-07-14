@@ -12,7 +12,7 @@ export default function ProviderTabs({ active }: { active: Provider }) {
           <Link
             key={provider}
             href={`/?provider=${provider}`}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold uppercase tracking-wide transition ${
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold uppercase tracking-wide transition-all duration-300 ${
               isActive
                 ? "bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow"
                 : "text-slate-400 hover:text-slate-200"
