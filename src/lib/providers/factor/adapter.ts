@@ -1,4 +1,4 @@
-import { EldAdapter, PageOpts, TimeWindowPageOpts } from "../types";
+import { EldAdapter, PageOpts, TimeWindowPageOpts, ProviderCredentials } from "../types";
 
 // Confirmed via browser DevTools (Network tab) against the real Factor ELD web app
 // (app.factoreld.com): the frontend calls a separate API host, not its own domain.
@@ -13,7 +13,11 @@ interface FactorApiCompany {
   [key: string]: unknown;
 }
 
-async function factorFetch(token: string, path: string, params?: Record<string, string>) {
+async function factorFetch(
+  { token, tenantId }: ProviderCredentials,
+  path: string,
+  params?: Record<string, string>
+) {
   const url = new URL(`${API_BASE}${path}`);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -21,12 +25,16 @@ async function factorFetch(token: string, path: string, params?: Record<string, 
     }
   }
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+  // Confirmed required -- without it the API returns 400 "Missing 'tenant_id' in header".
+  if (tenantId) {
+    headers.tenant_id = tenantId;
+  }
+
+  const res = await fetch(url, { headers });
 
   if (!res.ok) {
     throw new Error(`Factor ELD API ${res.status} on ${path}: ${await res.text().catch(() => "")}`);
@@ -35,10 +43,11 @@ async function factorFetch(token: string, path: string, params?: Record<string, 
   return res.json();
 }
 
-// Best-effort: the request shape (GET /companies?status=active&limit=N, Bearer auth) is
-// confirmed from a captured request, but the exact response JSON field names were not visible
-// in that capture (only request headers were shown) -- this parses defensively across a few
-// likely shapes. Verify against a real response body and adjust field names if this is off.
+// Best-effort: the request shape (GET /api/v1/companies?status=active&limit=N&page=1&group=all,
+// Bearer + tenant_id headers) is confirmed from a captured request, but the exact response JSON
+// field names were not visible in that capture (only headers were shown) -- this parses
+// defensively across a few likely shapes. Verify against a real response body and adjust field
+// names if this is off.
 function parseCompanyList(json: unknown): { providerCompanyId: string; name: string }[] {
   const list: FactorApiCompany[] = Array.isArray(json)
     ? json
@@ -55,37 +64,48 @@ function parseCompanyList(json: unknown): { providerCompanyId: string; name: str
 export const factorEldAdapter: EldAdapter = {
   provider: "factor",
 
-  async validateToken(token: string) {
+  async validateToken(credentials: ProviderCredentials) {
+    if (!credentials.tenantId) {
+      return {
+        valid: false,
+        reason: "Factor ELD also requires a tenant_id (see the tenant_id request header in DevTools), not just a token",
+      };
+    }
     try {
-      await factorFetch(token, "/companies", { status: "active", limit: "1" });
+      await factorFetch(credentials, "/api/v1/companies", { status: "active", limit: "1", page: "1", group: "all" });
       return { valid: true };
     } catch (err) {
       return { valid: false, reason: (err as Error).message };
     }
   },
 
-  async listCompanies(token: string) {
-    const json = await factorFetch(token, "/companies", { status: "active", limit: "200" });
+  async listCompanies(credentials: ProviderCredentials) {
+    const json = await factorFetch(credentials, "/api/v1/companies", {
+      status: "active",
+      limit: "200",
+      page: "1",
+      group: "all",
+    });
     return parseCompanyList(json);
   },
 
   // TODO: capture the real request -- open a company in app.factoreld.com, click its Drivers
   // tab, and check the Network tab for the endpoint + response shape, then fill this in.
-  async listDrivers(_token: string, _providerCompanyId: string, _opts: PageOpts) {
+  async listDrivers(_credentials: ProviderCredentials, _providerCompanyId: string, _opts: PageOpts) {
     throw new Error(
       "factorEldAdapter.listDrivers not implemented -- need the real drivers-list endpoint (open a company's Drivers tab in app.factoreld.com and capture the Network request)"
     );
   },
 
   // TODO: capture the HOS logs endpoint (open a driver's logs view) before filling this in.
-  async listLogs(_token: string, _providerDriverId: string, _opts: TimeWindowPageOpts) {
+  async listLogs(_credentials: ProviderCredentials, _providerDriverId: string, _opts: TimeWindowPageOpts) {
     throw new Error(
       "factorEldAdapter.listLogs not implemented -- need the real HOS logs endpoint (open a driver's logs in app.factoreld.com and capture the Network request)"
     );
   },
 
   // TODO: capture the violations endpoint before filling this in.
-  async listViolations(_token: string, _providerDriverId: string, _opts: TimeWindowPageOpts) {
+  async listViolations(_credentials: ProviderCredentials, _providerDriverId: string, _opts: TimeWindowPageOpts) {
     throw new Error(
       "factorEldAdapter.listViolations not implemented -- need the real violations endpoint (open a driver's violations view in app.factoreld.com and capture the Network request)"
     );

@@ -49,30 +49,38 @@ export interface TimeWindowPageOpts extends PageOpts {
   until: Date;
 }
 
+// Some providers (e.g. Factor ELD) need more than just a bearer token on every
+// request -- Factor also requires a stable per-account `tenant_id` header.
+// tenantId is optional so providers that don't need it can ignore it.
+export interface ProviderCredentials {
+  token: string;
+  tenantId?: string;
+}
+
 export interface EldAdapter {
   readonly provider: Provider;
 
-  validateToken(token: string): Promise<{ valid: boolean; reason?: string }>;
+  validateToken(credentials: ProviderCredentials): Promise<{ valid: boolean; reason?: string }>;
 
-  listCompanies(token: string): Promise<{ providerCompanyId: string; name: string }[]>;
+  listCompanies(credentials: ProviderCredentials): Promise<{ providerCompanyId: string; name: string }[]>;
 
   listDrivers(
-    token: string,
+    credentials: ProviderCredentials,
     providerCompanyId: string,
     opts: PageOpts
   ): Promise<{ drivers: RawDriverRecord[]; nextCursor: string | null }>;
 
   listLogs(
-    token: string,
+    credentials: ProviderCredentials,
     providerDriverId: string,
     opts: TimeWindowPageOpts
   ): Promise<{ logs: RawLogRecord[]; nextCursor: string | null }>;
 
   listViolations(
-    token: string,
+    credentials: ProviderCredentials,
     providerDriverId: string,
     opts: TimeWindowPageOpts
   ): Promise<{ violations: RawViolationRecord[]; nextCursor: string | null }>;
 
-  certifyLogs(token: string, providerLogIds: string[]): Promise<CertifyResult[]>;
+  certifyLogs(credentials: ProviderCredentials, providerLogIds: string[]): Promise<CertifyResult[]>;
 }

@@ -7,6 +7,7 @@ import {
   CertifyResult,
   PageOpts,
   TimeWindowPageOpts,
+  ProviderCredentials,
 } from "../types";
 import { seedFromString, createRng, pick } from "./rng";
 
@@ -76,7 +77,7 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
   return {
     provider: config.provider,
 
-    async validateToken(token: string) {
+    async validateToken({ token }: ProviderCredentials) {
       if (!token || token.trim().length < 4) {
         return { valid: false, reason: "Token looks too short" };
       }
@@ -93,7 +94,7 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
       }));
     },
 
-    async listDrivers(_token: string, providerCompanyId: string, opts: PageOpts) {
+    async listDrivers(_credentials: ProviderCredentials, providerCompanyId: string, opts: PageOpts) {
       const offset = opts.cursor ? parseInt(opts.cursor, 10) : 0;
       const all = Array.from({ length: DRIVERS_PER_COMPANY }, (_, i) => buildDriver(config, providerCompanyId, i));
       const page = all.slice(offset, offset + opts.pageSize);
@@ -104,7 +105,7 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
       };
     },
 
-    async listLogs(_token: string, providerDriverId: string, opts: TimeWindowPageOpts) {
+    async listLogs(_credentials: ProviderCredentials, providerDriverId: string, opts: TimeWindowPageOpts) {
       const rng = createRng(seedFromString(`${config.provider}:${providerDriverId}:logs:${opts.since.toISOString()}`));
       const statuses = [
         config.dutyStatusVocab.offDuty,
@@ -142,7 +143,7 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
       return { logs, nextCursor: null };
     },
 
-    async listViolations(_token: string, providerDriverId: string, opts: TimeWindowPageOpts) {
+    async listViolations(_credentials: ProviderCredentials, providerDriverId: string, opts: TimeWindowPageOpts) {
       const rng = createRng(seedFromString(`${config.provider}:${providerDriverId}:violations`));
       const driverIndexMatch = providerDriverId.match(/-drv-(\d+)$/);
       const index = driverIndexMatch ? parseInt(driverIndexMatch[1], 10) : 0;
@@ -175,7 +176,7 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
       return { violations: [violation], nextCursor: null };
     },
 
-    async certifyLogs(_token: string, providerLogIds: string[]): Promise<CertifyResult[]> {
+    async certifyLogs(_credentials: ProviderCredentials, providerLogIds: string[]): Promise<CertifyResult[]> {
       return providerLogIds.map((providerLogId) => ({
         providerLogId,
         success: true,

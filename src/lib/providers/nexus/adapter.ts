@@ -1,4 +1,4 @@
-import { EldAdapter, PageOpts, TimeWindowPageOpts } from "../types";
+import { EldAdapter, PageOpts, TimeWindowPageOpts, ProviderCredentials } from "../types";
 
 // TODO: replace with real Nexus ELD API calls once endpoint docs are available.
 export const nexusEldAdapter: EldAdapter = {
@@ -12,15 +12,15 @@ export const nexusEldAdapter: EldAdapter = {
     throw new Error("nexusEldAdapter.listCompanies not implemented");
   },
 
-  async listDrivers(_token: string, _providerCompanyId: string, _opts: PageOpts) {
+  async listDrivers(_credentials: ProviderCredentials, _providerCompanyId: string, _opts: PageOpts) {
     throw new Error("nexusEldAdapter.listDrivers not implemented");
   },
 
-  async listLogs(_token: string, _providerDriverId: string, _opts: TimeWindowPageOpts) {
+  async listLogs(_credentials: ProviderCredentials, _providerDriverId: string, _opts: TimeWindowPageOpts) {
     throw new Error("nexusEldAdapter.listLogs not implemented");
   },
 
-  async listViolations(_token: string, _providerDriverId: string, _opts: TimeWindowPageOpts) {
+  async listViolations(_credentials: ProviderCredentials, _providerDriverId: string, _opts: TimeWindowPageOpts) {
     throw new Error("nexusEldAdapter.listViolations not implemented");
   },
 

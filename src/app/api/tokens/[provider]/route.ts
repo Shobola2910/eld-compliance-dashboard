@@ -13,6 +13,7 @@ const PROVIDER_VALUES = ["leader", "factor", "nexus"] as const;
 
 const bodySchema = z.object({
   token: z.string().min(4),
+  tenantId: z.string().min(1).optional(),
   tokenVersion: z.enum(["v1", "v2"]).default("v2"),
 });
 
@@ -33,10 +34,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { token, tokenVersion } = parsed.data;
+  const { token, tenantId, tokenVersion } = parsed.data;
 
   const adapter = getAdapter(provider);
-  const validation = await adapter.validateToken(token).catch((err) => ({
+  const validation = await adapter.validateToken({ token, tenantId }).catch((err) => ({
     valid: false,
     reason: (err as Error).message,
   }));
@@ -49,10 +50,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
 
   await db
     .insert(providerTokens)
-    .values({ provider, encryptedToken, iv, authTag, tokenVersion, isValid: true, lastValidatedAt: new Date() })
+    .values({ provider, encryptedToken, iv, authTag, tenantId, tokenVersion, isValid: true, lastValidatedAt: new Date() })
     .onConflictDoUpdate({
       target: [providerTokens.provider],
-      set: { encryptedToken, iv, authTag, tokenVersion, isValid: true, lastValidatedAt: new Date(), updatedAt: new Date() },
+      set: {
+        encryptedToken,
+        iv,
+        authTag,
+        tenantId,
+        tokenVersion,
+        isValid: true,
+        lastValidatedAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
 
   after(() => runSyncForProvider(provider).catch((err) => console.error(`sync after token save failed: ${err}`)));
@@ -78,5 +88,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
     isValid: row.isValid,
     tokenVersion: row.tokenVersion,
     lastValidatedAt: row.lastValidatedAt,
+    hasTenantId: !!row.tenantId,
   });
 }

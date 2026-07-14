@@ -14,15 +14,24 @@ interface TokenStatus {
   isValid?: boolean;
   tokenVersion?: string;
   lastValidatedAt?: string | null;
+  hasTenantId?: boolean;
 }
+
+// Factor ELD's real API also requires a stable per-account tenant_id header
+// alongside the bearer token (see DevTools -> that same request's Request
+// Headers). Other providers don't need this yet.
+const PROVIDERS_NEEDING_TENANT_ID: Props["provider"][] = ["factor"];
 
 export default function TokenAuthTabs({ provider, label }: Props) {
   const router = useRouter();
   const [token, setToken] = useState("");
+  const [tenantId, setTenantId] = useState("");
   const [status, setStatus] = useState<TokenStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const needsTenantId = PROVIDERS_NEEDING_TENANT_ID.includes(provider);
 
   useEffect(() => {
     fetch(`/api/tokens/${provider}`)
@@ -40,7 +49,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
       const res = await fetch(`/api/tokens/${provider}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, tokenVersion: "v2" }),
+        body: JSON.stringify({ token, tenantId: tenantId || undefined, tokenVersion: "v2" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -49,6 +58,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
       }
       setSuccess("Token saved. Sync starting in the background.");
       setToken("");
+      setTenantId("");
       const refreshed = await fetch(`/api/tokens/${provider}`).then((r) => r.json());
       setStatus(refreshed);
       router.refresh();
@@ -87,6 +97,23 @@ export default function TokenAuthTabs({ provider, label }: Props) {
             This token will be used for {label} dashboard access and encrypted at rest.
           </p>
         </div>
+
+        {needsTenantId && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-400">Tenant ID</label>
+            <input
+              required
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value)}
+              placeholder="e.g. 96335ac3-5a93-4a29-af8b-08d874801325"
+              className="w-full rounded-md border border-slate-700 bg-[#0b0e14] px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              {label} also requires this. In DevTools → Network, open any API request and copy the{" "}
+              <code className="text-slate-400">tenant_id</code> request header value.
+            </p>
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
         {success && <p className="text-sm text-emerald-400">{success}</p>}

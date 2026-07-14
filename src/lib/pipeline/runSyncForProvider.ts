@@ -16,7 +16,7 @@ import { normalizeDutyStatus, normalizeViolationType } from "./normalize";
 import { isEligibleForAutoCertify } from "./certify";
 import { detectConnectionChange, ConnectionStatus } from "./connection-status";
 import { isProfileStale } from "./stale-profile";
-import type { EldAdapter, Provider } from "../providers/types";
+import type { EldAdapter, Provider, ProviderCredentials } from "../providers/types";
 
 const LOG_WINDOW_HOURS = 48;
 const DRIVER_PAGE_SIZE = 25;
@@ -48,16 +48,16 @@ export async function runSyncForProvider(provider: Provider): Promise<ProviderSy
   }
 
   const adapter = getAdapter(provider);
-  let token: string;
+  let credentials: ProviderCredentials;
   try {
-    token = decryptToken(tokenRow);
+    credentials = { token: decryptToken(tokenRow), tenantId: tokenRow.tenantId ?? undefined };
   } catch (err) {
     return { provider, status: "failed", companies: [], errorMessage: `Token decryption failed: ${(err as Error).message}` };
   }
 
   let providerCompanies: { providerCompanyId: string; name: string }[];
   try {
-    providerCompanies = await adapter.listCompanies(token);
+    providerCompanies = await adapter.listCompanies(credentials);
   } catch (err) {
     return { provider, status: "failed", companies: [], errorMessage: (err as Error).message };
   }
@@ -74,7 +74,7 @@ export async function runSyncForProvider(provider: Provider): Promise<ProviderSy
       })
       .returning();
 
-    const result = await syncOneCompany(company.id, company.name, provider, adapter, token);
+    const result = await syncOneCompany(company.id, company.name, provider, adapter, credentials);
     results.push(result);
   }
 
@@ -90,7 +90,7 @@ async function syncOneCompany(
   companyName: string,
   provider: Provider,
   adapter: EldAdapter,
-  token: string
+  credentials: ProviderCredentials
 ): Promise<CompanySyncResult> {
   const [syncRun] = await db.insert(syncRuns).values({ companyId, provider, status: "running" }).returning();
 
@@ -106,14 +106,14 @@ async function syncOneCompany(
   try {
     let cursor: string | undefined;
     do {
-      const page = await adapter.listDrivers(token, company.providerCompanyId, {
+      const page = await adapter.listDrivers(credentials, company.providerCompanyId, {
         cursor,
         pageSize: DRIVER_PAGE_SIZE,
       });
 
       for (const rawDriver of page.drivers) {
         try {
-          await syncOneDriver({ companyId, provider, rawDriver, since, until: now, adapter, token });
+          await syncOneDriver({ companyId, provider, rawDriver, since, until: now, adapter, credentials });
           driversProcessed += 1;
         } catch (err) {
           hadError = true;
@@ -155,9 +155,9 @@ async function syncOneDriver(args: {
   since: Date;
   until: Date;
   adapter: EldAdapter;
-  token: string;
+  credentials: ProviderCredentials;
 }) {
-  const { companyId, provider, rawDriver, since, until, adapter, token } = args;
+  const { companyId, provider, rawDriver, since, until, adapter, credentials } = args;
 
   const [existingDriver] = await db
     .select()
@@ -221,8 +221,8 @@ async function syncOneDriver(args: {
   }
 
   const [violationPage, logPage] = await Promise.all([
-    adapter.listViolations(token, rawDriver.providerDriverId, { since, until, pageSize: 100 }),
-    adapter.listLogs(token, rawDriver.providerDriverId, { since, until, pageSize: 100 }),
+    adapter.listViolations(credentials, rawDriver.providerDriverId, { since, until, pageSize: 100 }),
+    adapter.listLogs(credentials, rawDriver.providerDriverId, { since, until, pageSize: 100 }),
   ]);
 
   for (const rawViolation of violationPage.violations) {
@@ -301,7 +301,7 @@ async function syncOneDriver(args: {
   }
 
   if (logsToCertify.length > 0) {
-    const results = await adapter.certifyLogs(token, logsToCertify.map((l) => l.providerLogId));
+    const results = await adapter.certifyLogs(credentials, logsToCertify.map((l) => l.providerLogId));
     const resultByProviderLogId = new Map(results.map((r) => [r.providerLogId, r]));
 
     for (const { id, providerLogId } of logsToCertify) {

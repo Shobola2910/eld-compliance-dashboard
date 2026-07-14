@@ -72,6 +72,10 @@ export const providerTokens = pgTable("provider_tokens", {
   encryptedToken: text("encrypted_token").notNull(),
   iv: text("iv").notNull(),
   authTag: text("auth_tag").notNull(),
+  // Not every provider needs this -- Factor ELD requires a stable per-account
+  // tenant_id header alongside the bearer token, others don't use it at all.
+  // Not a secret on its own (just an account identifier), so stored in plain text.
+  tenantId: text("tenant_id"),
   tokenVersion: text("token_version").default("v2").notNull(),
   isValid: boolean("is_valid").default(true).notNull(),
   lastValidatedAt: timestamp("last_validated_at", { withTimezone: true }),
