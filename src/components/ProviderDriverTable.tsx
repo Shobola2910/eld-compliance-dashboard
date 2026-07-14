@@ -7,26 +7,27 @@ import type { Provider } from "@/lib/providers/types";
 import ConnectionBadge from "@/components/ConnectionBadge";
 
 export default async function ProviderDriverTable({ provider }: { provider: Provider }) {
-  const rows = await db
-    .select({
-      driverId: drivers.id,
-      driverName: drivers.name,
-      truckNumber: drivers.truckNumber,
-      trailerNumber: drivers.trailerNumber,
-      connectionStatus: drivers.connectionStatus,
-      shippingDocsUpdatedAt: drivers.shippingDocsUpdatedAt,
-      companyName: companies.name,
-    })
-    .from(drivers)
-    .innerJoin(companies, eq(drivers.companyId, companies.id))
-    .where(and(eq(drivers.isActive, true), eq(drivers.provider, provider)))
-    .orderBy(companies.name, drivers.name);
-
-  const openViolationCounts = await db
-    .select({ driverId: violations.driverId, count: sql<number>`count(*)` })
-    .from(violations)
-    .where(and(isNull(violations.resolvedAt), eq(violations.provider, provider)))
-    .groupBy(violations.driverId);
+  const [rows, openViolationCounts] = await Promise.all([
+    db
+      .select({
+        driverId: drivers.id,
+        driverName: drivers.name,
+        truckNumber: drivers.truckNumber,
+        trailerNumber: drivers.trailerNumber,
+        connectionStatus: drivers.connectionStatus,
+        shippingDocsUpdatedAt: drivers.shippingDocsUpdatedAt,
+        companyName: companies.name,
+      })
+      .from(drivers)
+      .innerJoin(companies, eq(drivers.companyId, companies.id))
+      .where(and(eq(drivers.isActive, true), eq(drivers.provider, provider)))
+      .orderBy(companies.name, drivers.name),
+    db
+      .select({ driverId: violations.driverId, count: sql<number>`count(*)` })
+      .from(violations)
+      .where(and(isNull(violations.resolvedAt), eq(violations.provider, provider)))
+      .groupBy(violations.driverId),
+  ]);
 
   const violationCountByDriver = new Map(openViolationCounts.map((v) => [v.driverId, Number(v.count)]));
   const now = new Date();
