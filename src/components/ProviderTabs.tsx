@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { PROVIDERS, PROVIDER_LABELS } from "@/lib/providers/registry";
 import type { Provider } from "@/lib/providers/types";
-
-const PROVIDER_ICONS: Record<Provider, string> = {
-  leader: "/leader-eld.ico",
-  factor: "/factor-eld.ico",
-  nexus: "/nexus-eld.ico",
-};
+import ProviderIcon from "@/components/ProviderIcon";
 
 export default function ProviderTabs({ active }: { active: Provider }) {
   return (
@@ -23,8 +18,7 @@ export default function ProviderTabs({ active }: { active: Provider }) {
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={PROVIDER_ICONS[provider]} alt="" className="h-4 w-4 rounded-sm" />
+            <ProviderIcon provider={provider} size="sm" />
             {PROVIDER_LABELS[provider]}
           </Link>
         );

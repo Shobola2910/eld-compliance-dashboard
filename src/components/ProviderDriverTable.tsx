@@ -5,6 +5,7 @@ import { drivers, companies, violations } from "@/lib/db/schema";
 import { isProfileStale } from "@/lib/pipeline/stale-profile";
 import type { Provider } from "@/lib/providers/types";
 import ConnectionBadge from "@/components/ConnectionBadge";
+import ProviderIcon from "@/components/ProviderIcon";
 
 export default async function ProviderDriverTable({ provider }: { provider: Provider }) {
   const [rows, openViolationCounts] = await Promise.all([
@@ -61,7 +62,11 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
             return (
               <tr key={row.driverId} className="bg-[#111623] hover:bg-[#151b2b]">
                 <td className="px-4 py-3">
-                  <Link href={`/drivers/${row.driverId}`} className="font-medium text-blue-400 hover:underline">
+                  <Link
+                    href={`/drivers/${row.driverId}`}
+                    className="flex items-center gap-2 font-medium text-blue-400 hover:underline"
+                  >
+                    <ProviderIcon provider={provider} size="sm" />
                     {row.driverName}
                   </Link>
                 </td>

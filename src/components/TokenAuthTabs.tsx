@@ -2,17 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ProviderIcon from "@/components/ProviderIcon";
 
 interface Props {
   provider: "leader" | "factor" | "nexus";
   label: string;
 }
-
-const PROVIDER_ICONS: Record<Props["provider"], string> = {
-  leader: "/leader-eld.ico",
-  factor: "/factor-eld.ico",
-  nexus: "/nexus-eld.ico",
-};
 
 interface TokenStatus {
   saved: boolean;
@@ -65,9 +60,8 @@ export default function TokenAuthTabs({ provider, label }: Props) {
   return (
     <div className="w-full max-w-md rounded-xl border border-slate-800 bg-[#111623] p-6 shadow-xl">
       <div className="flex flex-col items-center text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={PROVIDER_ICONS[provider]} alt={`${label} logo`} className="mb-3 h-12 w-12 rounded-lg" />
-        <h2 className="text-base font-semibold text-slate-100">{label} Automations</h2>
+        <ProviderIcon provider={provider} size="lg" />
+        <h2 className="mt-3 text-base font-semibold text-slate-100">{label} Automations</h2>
         <p className="mt-1 text-sm text-slate-400">Paste your token to connect</p>
       </div>
 
