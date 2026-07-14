@@ -32,21 +32,30 @@ realistic fake data. Flip `ELD_MODE=live` once a given provider's `adapter.ts` i
 
 ## Sync cadence
 
-Vercel's Hobby plan only allows daily native Cron Jobs, which is too slow for near-real-time
-connect/disconnect tracking. So the real cadence comes from `.github/workflows/eld-sync.yml`
-(GitHub Actions, free, every 15 minutes), which calls `/api/cron/sync`. `vercel.json` also
-registers a once-daily Vercel Cron hitting the same endpoint as a fallback safety net.
+The app runs on Fly.io as a persistent (always-on) machine, not a serverless function, so the sync
+loop runs **inside the server process itself**: `src/instrumentation.ts` starts a `setInterval` when
+the server boots (10s after startup, then every `SYNC_INTERVAL_MINUTES`, default 15) that calls
+`runSyncForProvider` for Leader/Factor/Nexus directly — no external cron service needed.
 
-For the GitHub Actions workflow to work after deploying, add two repo secrets under
-**Settings → Secrets and variables → Actions**:
-- `APP_URL` — your deployed Vercel URL (e.g. `https://your-app.vercel.app`)
-- `CRON_SECRET` — same value as the `CRON_SECRET` env var set in Vercel
+`/api/cron/sync` (protected by `CRON_SECRET`) still exists as a manual/on-demand trigger — e.g. to
+force an immediate resync from `curl` — but it's optional now.
 
-## Deploying
+## Deploying (Fly.io)
 
-1. Push this repo to GitHub, import it into Vercel.
-2. In Vercel project settings, add env vars: `DATABASE_URL`, `TOKEN_ENC_KEY`, `CRON_SECRET`,
-   `SESSION_SECRET`, `ELD_MODE`, `APP_URL` (matching `.env.example`).
-3. Add the same `APP_URL` / `CRON_SECRET` as GitHub Actions repo secrets (above).
-4. Run `npm run db:push` and `npm run seed:user -- you@company.com yourpassword` once, pointed at
-   the production `DATABASE_URL`, to create the schema and your login.
+1. Install the CLI and log in: `curl -L https://fly.io/install.sh | sh`, then `fly auth login`
+   (opens a browser to sign in/sign up).
+2. From the project root: `fly launch --no-deploy` — it will detect the existing `Dockerfile` and
+   `fly.toml`; confirm or rename the app (names are globally unique) and pick a region.
+3. Create a Postgres database: `fly postgres create`, then `fly postgres attach <db-app-name>` to
+   this app (this sets `DATABASE_URL` automatically) — or use an external Neon/Postgres URL instead.
+4. Set the remaining secrets:
+   ```
+   fly secrets set TOKEN_ENC_KEY=... CRON_SECRET=... SESSION_SECRET=... ELD_MODE=mock
+   ```
+   (copy the generated values from your local `.env.local`, or generate fresh ones for production).
+5. Deploy: `fly deploy`
+6. Run the schema push and create your login against production, e.g. via `fly ssh console` or by
+   running `DATABASE_URL=<prod-url> npm run db:push` / `npm run seed:user -- ...` from your machine.
+
+GitHub stays the source of truth — push to `main`/`master` and re-run `fly deploy` (or wire up
+`flyctl deploy` in a GitHub Actions workflow for auto-deploy-on-push, not included yet).
