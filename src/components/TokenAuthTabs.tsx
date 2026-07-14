@@ -7,6 +7,12 @@ interface Props {
   label: string;
 }
 
+const PROVIDER_ICONS: Record<Props["provider"], string> = {
+  leader: "/leader-eld.ico",
+  factor: "/factor-eld.ico",
+  nexus: "/nexus-eld.ico",
+};
+
 interface TokenStatus {
   saved: boolean;
   isValid?: boolean;
@@ -56,8 +62,12 @@ export default function TokenAuthTabs({ provider, label }: Props) {
 
   return (
     <div className="w-full max-w-md rounded-xl border border-slate-800 bg-[#111623] p-6 shadow-xl">
-      <h2 className="text-base font-semibold text-slate-100">{label} Automations</h2>
-      <p className="mt-1 text-sm text-slate-400">Sign in to continue to your dashboard</p>
+      <div className="flex flex-col items-center text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={PROVIDER_ICONS[provider]} alt={`${label} logo`} className="mb-3 h-12 w-12 rounded-lg" />
+        <h2 className="text-base font-semibold text-slate-100">{label} Automations</h2>
+        <p className="mt-1 text-sm text-slate-400">Sign in to continue to your dashboard</p>
+      </div>
 
       {status?.saved && (
         <div className="mt-4 rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">

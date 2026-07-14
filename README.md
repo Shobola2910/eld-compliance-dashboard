@@ -4,6 +4,9 @@ One dashboard for Leader ELD, Factor ELD, and Nexus ELD: auto-certify, auto-norm
 tracking with timestamps, driver connect/disconnect monitoring, and alerts for drivers who haven't
 updated shipping docs / trailer number in 3+ days.
 
+There is no separate app login — the ELD provider token itself is the credential. Anyone with the
+URL can open the dashboard and paste a token under Settings.
+
 Full design notes: `C:\Users\Ismoil\.claude\plans\sprightly-petting-corbato.md`.
 
 ## Local setup
@@ -13,9 +16,8 @@ Full design notes: `C:\Users\Ismoil\.claude\plans\sprightly-petting-corbato.md`.
    connection string (Neon / Vercel Postgres). Everything else in `.env.local` already has generated
    dev secrets.
 3. Push the schema: `npm run db:push`
-4. Create your login: `npm run seed:user -- you@company.com yourpassword`
-5. `npm run dev`, then open http://localhost:3000 and sign in.
-6. Populate mock data without waiting for real ELD tokens: log in, then
+4. `npm run dev`, then open http://localhost:3000.
+5. Populate mock data without waiting for real ELD tokens:
    `curl -X POST http://localhost:3000/api/dev/seed` (dev-only route, disabled in production). This
    saves a dummy token for each of the 3 providers and runs a full mock sync so the dashboard,
    driver pages, and alerts are populated end-to-end.
@@ -61,6 +63,6 @@ For the GitHub Actions workflow to work after deploying, add two repo secrets un
 4. Click Deploy.
 5. Add the same `APP_URL` / `CRON_SECRET` as GitHub Actions repo secrets (see above) so the 15-minute
    sync workflow can call the deployed app.
-6. Run `npm run db:push` and `npm run seed:user -- you@company.com yourpassword` once, pointed at
-   the production `DATABASE_URL` (from your own machine, with `DATABASE_URL` temporarily set to the
-   production value), to create the schema and your login.
+6. Run `npm run db:push` once, pointed at the production `DATABASE_URL` (from your own machine, with
+   `DATABASE_URL` temporarily set to the production value), to create the schema. Then open the
+   deployed URL and paste each provider's token under Settings — no login step needed.

@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getSession } from "@/lib/auth/session";
-import LogoutButton from "@/components/LogoutButton";
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
@@ -9,17 +6,12 @@ const NAV_LINKS = [
 ];
 
 const PROVIDER_LINKS = [
-  { href: "/settings/tokens/leader", label: "Leader ELD" },
-  { href: "/settings/tokens/factor", label: "Factor ELD" },
-  { href: "/settings/tokens/nexus", label: "Nexus ELD" },
+  { href: "/settings/tokens/leader", label: "Leader ELD", icon: "/leader-eld.ico" },
+  { href: "/settings/tokens/factor", label: "Factor ELD", icon: "/factor-eld.ico" },
+  { href: "/settings/tokens/nexus", label: "Nexus ELD", icon: "/nexus-eld.ico" },
 ];
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  if (!session) {
-    redirect("/login");
-  }
-
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#0b0e14]">
       <aside className="flex w-56 flex-col border-r border-slate-800 bg-[#0d1117] p-4">
@@ -46,17 +38,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link
               key={link.href}
               href={link.href}
-              className="block rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-slate-100"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={link.icon} alt="" className="h-4 w-4 rounded-sm" />
               {link.label}
             </Link>
           ))}
         </nav>
-
-        <div className="border-t border-slate-800 pt-3">
-          <p className="truncate px-3 text-xs text-slate-500">{session.email}</p>
-          <LogoutButton />
-        </div>
       </aside>
 
       <main className="flex-1 overflow-x-auto p-6">{children}</main>

@@ -50,15 +50,6 @@ export const syncStatusEnum = pgEnum("sync_status", [
   "failed",
 ]);
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull(),
-  passwordHash: text("password_hash").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => ({
-  emailIdx: uniqueIndex("users_email_idx").on(t.email),
-}));
-
 export const companies = pgTable("companies", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
