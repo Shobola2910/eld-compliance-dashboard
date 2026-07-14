@@ -19,8 +19,11 @@ const liveAdapters: Record<Provider, EldAdapter> = {
 };
 
 export function getAdapter(provider: Provider): EldAdapter {
-  const isLive = process.env.ELD_MODE === "live";
-  return isLive ? liveAdapters[provider] : mockAdapters[provider];
+  // Per-provider override (e.g. ELD_MODE_FACTOR=live) takes precedence over the global ELD_MODE,
+  // so one provider can go live while the others stay on mock data.
+  const override = process.env[`ELD_MODE_${provider.toUpperCase()}`];
+  const mode = override ?? process.env.ELD_MODE ?? "mock";
+  return mode === "live" ? liveAdapters[provider] : mockAdapters[provider];
 }
 
 export const PROVIDER_LABELS: Record<Provider, string> = {

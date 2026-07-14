@@ -28,9 +28,16 @@ Go to Settings → Leader ELD / Factor ELD / Nexus ELD in the sidebar, paste tha
 token, and save. One token per provider unlocks every company and driver visible under that
 account — saving it kicks off an immediate sync in the background.
 
-Leader/Factor/Nexus's real API endpoints aren't wired up yet (`src/lib/providers/*/adapter.ts` are
-TODO stubs) — until their docs are available, `ELD_MODE=mock` (the default) drives the whole app off
-realistic fake data. Flip `ELD_MODE=live` once a given provider's `adapter.ts` is filled in.
+Leader/Factor/Nexus's real API endpoints mostly aren't wired up yet (`src/lib/providers/*/adapter.ts`)
+— until they are, `ELD_MODE=mock` (the default) drives the whole app off realistic fake data.
+
+**Factor ELD is partially live**: `factor/adapter.ts` has a real `validateToken`/`listCompanies`
+(confirmed via the real app's Network tab — `GET https://api.drivehos.app/companies`, Bearer auth).
+`listDrivers`/`listLogs`/`listViolations`/`certifyLogs` still throw a clear "not implemented" error
+naming the endpoint that needs capturing next (open that view in app.factoreld.com, check DevTools →
+Network). Set `ELD_MODE_FACTOR=live` (leaving `ELD_MODE=mock` for Leader/Nexus) to test real company
+sync today — it'll pull real companies, then fail gracefully per-company at the drivers step until
+that endpoint is filled in (visible in each company's `sync_runs` row).
 
 ## Sync cadence
 
@@ -57,7 +64,6 @@ For the GitHub Actions workflow to work after deploying, add two repo secrets un
      one, or paste an existing Neon URL)
    - `TOKEN_ENC_KEY`
    - `CRON_SECRET`
-   - `SESSION_SECRET`
    - `ELD_MODE=mock`
    - `APP_URL` — fill in once you know the deployed URL (can update after first deploy)
 4. Click Deploy.
