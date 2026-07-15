@@ -26,10 +26,46 @@ const START_URL = "https://app.factoreld.com";
 const API_HOST_FILTER = "api.drivehos.app";
 const LOG_FILE = "capture-log.jsonl";
 
+// Fields that must never land on disk (or get pasted into a chat) in plain text.
+const SENSITIVE_KEYS = new Set([
+  "password",
+  "recaptcha_token",
+  "authorization",
+  "access_token",
+  "refresh_token",
+]);
+
+function redact(value) {
+  if (Array.isArray(value)) return value.map(redact);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [key, val] of Object.entries(value)) {
+      out[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? "[REDACTED]" : redact(val);
+    }
+    return out;
+  }
+  return value;
+}
+
+function redactJsonString(maybeJson) {
+  if (!maybeJson) return maybeJson;
+  try {
+    return JSON.stringify(redact(JSON.parse(maybeJson)));
+  } catch {
+    return maybeJson; // not JSON (e.g. form-encoded) -- leave as-is
+  }
+}
+
 writeFileSync(LOG_FILE, ""); // start fresh each run
 
 function logEvent(event) {
-  appendFileSync(LOG_FILE, JSON.stringify(event) + "\n");
+  const safeEvent = {
+    ...event,
+    headers: redact(event.headers),
+    postData: redactJsonString(event.postData),
+    responseBody: redact(event.responseBody),
+  };
+  appendFileSync(LOG_FILE, JSON.stringify(safeEvent) + "\n");
   console.log(`[captured] ${event.method} ${event.url} -> ${event.status ?? "pending"}`);
 }
 

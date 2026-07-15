@@ -176,12 +176,8 @@ export function createMockAdapter(config: MockAdapterConfig): EldAdapter {
       return { violations: [violation], nextCursor: null };
     },
 
-    async certifyLogs(_credentials: ProviderCredentials, providerLogIds: string[]): Promise<CertifyResult[]> {
-      return providerLogIds.map((providerLogId) => ({
-        providerLogId,
-        success: true,
-        certifiedAt: new Date().toISOString(),
-      }));
+    async certifyLogs(): Promise<CertifyResult> {
+      return { success: true, certifiedAt: new Date().toISOString() };
     },
   };
 }

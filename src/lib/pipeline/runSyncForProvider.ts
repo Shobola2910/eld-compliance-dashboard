@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/client";
 import {
   companies,
@@ -18,7 +18,10 @@ import { detectConnectionChange, ConnectionStatus } from "./connection-status";
 import { isProfileStale } from "./stale-profile";
 import type { EldAdapter, Provider, ProviderCredentials } from "../providers/types";
 
-const LOG_WINDOW_HOURS = 48;
+// Must exceed STALE_PROFILE_THRESHOLD_DAYS (3 days) with margin -- Factor's
+// listLogs derives shippingDocsUpdatedAt from this same window, and a window
+// shorter than the staleness threshold could never actually observe staleness.
+const LOG_WINDOW_HOURS = 24 * 5;
 const DRIVER_PAGE_SIZE = 25;
 
 export interface CompanySyncResult {
@@ -275,6 +278,19 @@ async function syncOneDriver(args: {
     adapter.listLogs(credentials, rawDriver.providerDriverId, { since, until, pageSize: 100 }),
   ]);
 
+  if (logPage.driverMeta && (logPage.driverMeta.trailerNumber || logPage.driverMeta.shippingDocsUpdatedAt)) {
+    await db
+      .update(drivers)
+      .set({
+        ...(logPage.driverMeta.trailerNumber ? { trailerNumber: logPage.driverMeta.trailerNumber } : {}),
+        ...(logPage.driverMeta.shippingDocsUpdatedAt
+          ? { shippingDocsUpdatedAt: new Date(logPage.driverMeta.shippingDocsUpdatedAt) }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(drivers.id, driver.id));
+  }
+
   for (const rawViolation of violationPage.violations) {
     await db
       .insert(violations)
@@ -305,7 +321,7 @@ async function syncOneDriver(args: {
     .from(violations)
     .where(and(eq(violations.driverId, driver.id), isNull(violations.resolvedAt)));
 
-  const logsToCertify: { id: string; providerLogId: string }[] = [];
+  const logsToCertify: string[] = [];
 
   for (const rawLog of logPage.logs) {
     const startedAt = new Date(rawLog.startedAt);
@@ -346,22 +362,17 @@ async function syncOneDriver(args: {
       log.certifyStatus === "pending" &&
       isEligibleForAutoCertify({ startedAt, endedAt, hasOverlappingOpenViolation })
     ) {
-      logsToCertify.push({ id: log.id, providerLogId: log.providerLogId });
+      logsToCertify.push(log.id);
     }
   }
 
   if (logsToCertify.length > 0) {
-    const results = await adapter.certifyLogs(credentials, logsToCertify.map((l) => l.providerLogId));
-    const resultByProviderLogId = new Map(results.map((r) => [r.providerLogId, r]));
-
-    for (const { id, providerLogId } of logsToCertify) {
-      const result = resultByProviderLogId.get(providerLogId);
-      if (result?.success) {
-        await db
-          .update(normalizedLogs)
-          .set({ certifyStatus: "auto_certified", certifiedAt: new Date(), updatedAt: new Date() })
-          .where(eq(normalizedLogs.id, id));
-      }
+    const result = await adapter.certifyLogs(credentials, rawDriver.providerDriverId, { since, until });
+    if (result.success) {
+      await db
+        .update(normalizedLogs)
+        .set({ certifyStatus: "auto_certified", certifiedAt: new Date(), updatedAt: new Date() })
+        .where(inArray(normalizedLogs.id, logsToCertify));
     }
   }
 }

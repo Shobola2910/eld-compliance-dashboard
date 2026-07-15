@@ -1,4 +1,4 @@
-import { EldAdapter, PageOpts, TimeWindowPageOpts, ProviderCredentials, RawDriverRecord, RawViolationRecord } from "../types";
+import { EldAdapter, PageOpts, TimeWindowPageOpts, ProviderCredentials, RawDriverRecord, RawLogRecord, RawViolationRecord } from "../types";
 
 // Confirmed via browser DevTools (Network tab) against the real Factor ELD web app
 // (app.factoreld.com): the frontend calls a separate API host, not its own domain.
@@ -21,6 +21,26 @@ interface FactorApiCompany {
   active_driver: number;
   [key: string]: unknown;
 }
+
+interface FactorApiEvent {
+  id: string;
+  driver_id: string;
+  event_code: string;
+  event_start_time: string;
+  event_end_time: string | null;
+  odometer: number | null;
+  lat: number | null;
+  lon: number | null;
+  trailers: string;
+  shipping_docs: string;
+  [key: string]: unknown;
+}
+
+// Confirmed real via DevTools (clicking into a driver's log page): GET /api/v1/events
+// returns EVERY event for that driver in the range, not just duty-status changes --
+// engine on/off, certification markers (DR_CERT_1), login/logout, etc. are mixed in.
+// Only these four represent an actual duty-status segment for HOS purposes.
+const DUTY_EVENT_CODES = new Set(["DS_D", "DS_ON", "DS_OFF", "DS_SB"]);
 
 interface FactorApiDriver {
   company_id: string;
@@ -71,6 +91,58 @@ async function factorFetch(
   }
 
   return res.json();
+}
+
+async function factorPost(
+  { token, tenantId }: ProviderCredentials,
+  path: string,
+  body: Record<string, unknown>
+) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  if (tenantId) {
+    headers.tenant_id = tenantId;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Factor ELD API ${res.status} on ${path}: ${await res.text().catch(() => "")}`);
+  }
+
+  return res.json();
+}
+
+// Derives the driver's CURRENT trailer#/shipping-docs and (best-effort) when
+// that value last changed, by walking the full (unfiltered) event history
+// oldest-first and tracking the most recent value-change per field. If the
+// value hasn't changed anywhere in the fetched window, the "updated at" we
+// report is just the oldest event we saw -- an honest lower bound ("at least
+// this old"), not a false-precise timestamp; still correct enough to trigger
+// the 3-day staleness alert.
+function deriveDriverMeta(events: FactorApiEvent[]): { trailerNumber: string | null; shippingDocsUpdatedAt: string | null } {
+  const sorted = [...events].sort((a, b) => a.event_start_time.localeCompare(b.event_start_time));
+
+  let trailerNumber: string | null = null;
+  let shippingDocsUpdatedAt: string | null = null;
+  let lastShippingDocs: string | undefined;
+
+  for (const e of sorted) {
+    if (e.trailers) trailerNumber = e.trailers;
+    if (e.shipping_docs && e.shipping_docs !== lastShippingDocs) {
+      shippingDocsUpdatedAt = e.event_start_time;
+      lastShippingDocs = e.shipping_docs;
+    }
+  }
+
+  return { trailerNumber, shippingDocsUpdatedAt };
 }
 
 // Confirmed real via DevTools: GET /api/v1/hos/system-list returns EVERY driver across
@@ -207,10 +279,33 @@ export const factorEldAdapter: EldAdapter = {
     return { drivers, nextCursor: null };
   },
 
-  // Not available from system-list -- still need the real HOS logs endpoint
-  // (open a driver's logs in app.factoreld.com and capture the Network request).
-  async listLogs(_credentials: ProviderCredentials, _providerDriverId: string, _opts: TimeWindowPageOpts) {
-    return { logs: [], nextCursor: null };
+  // Confirmed real via DevTools: GET /api/v1/events?driver_id=&start_date=&end_date=
+  // returns every event (not paginated) for that driver in the window -- duty-status
+  // changes plus engine/cert/login noise mixed in. Also carries current trailer#/
+  // shipping-docs on each event, which system-list doesn't have -- see deriveDriverMeta.
+  async listLogs(credentials: ProviderCredentials, providerDriverId: string, opts: TimeWindowPageOpts) {
+    const json = await factorFetch(credentials, "/api/v1/events", {
+      driver_id: providerDriverId,
+      start_date: opts.since.toISOString(),
+      end_date: opts.until.toISOString(),
+      timezone: "America/New_York",
+    });
+    const events = (json as { data?: { events?: FactorApiEvent[] } })?.data?.events ?? [];
+
+    const logs: RawLogRecord[] = events
+      .filter((e) => DUTY_EVENT_CODES.has(e.event_code))
+      .map((e) => ({
+        providerLogId: e.id,
+        providerDriverId: e.driver_id,
+        dutyStatus: e.event_code,
+        startedAt: e.event_start_time,
+        endedAt: e.event_end_time,
+        odometer: e.odometer,
+        location: e.lat != null && e.lon != null ? { lat: e.lat, lng: e.lon } : null,
+        raw: e,
+      }));
+
+    return { logs, nextCursor: null, driverMeta: deriveDriverMeta(events) };
   },
 
   async listViolations(credentials: ProviderCredentials, providerDriverId: string, _opts: TimeWindowPageOpts) {
@@ -220,10 +315,32 @@ export const factorEldAdapter: EldAdapter = {
     return { violations, nextCursor: null };
   },
 
-  // TODO: capture the certify action's endpoint before filling this in.
-  async certifyLogs() {
-    throw new Error(
-      "factorEldAdapter.certifyLogs not implemented -- need the real certify endpoint (click Certify on a log in app.factoreld.com and capture the Network request)"
-    );
+  // Confirmed real via DevTools: POST /api/v1/events/bulk-certification with
+  // {driver_id, start_date, end_date} -- certifies every day in that range for
+  // that driver in one call (no per-log-id concept on Factor's side; re-running
+  // over an already-certified range is safe, it only adds DR_CERT_1 markers for
+  // days that don't have one yet).
+  async certifyLogs(credentials: ProviderCredentials, providerDriverId: string, opts: { since: Date; until: Date }) {
+    try {
+      await factorPost(credentials, "/api/v1/events/bulk-certification", {
+        driver_id: providerDriverId,
+        start_date: opts.since.toISOString(),
+        end_date: opts.until.toISOString(),
+      });
+      return { success: true, certifiedAt: new Date().toISOString() };
+    } catch (err) {
+      return { success: false, errorMessage: (err as Error).message };
+    }
   },
+
+  // NOTE on "Normalize" (POST /api/v1/events/normalizer): the endpoint itself is
+  // confirmed via DevTools, but deliberately NOT wired up here. Unlike Certify,
+  // Normalize submits a specific corrected odometer/engine_hours value at a given
+  // seq_id -- it's meant to fix a real ECM/odometer discrepancy, and the correct
+  // value has to come from somewhere trustworthy (a flagged diagnostic error, the
+  // vehicle's real current reading, etc). The captured example had no matching
+  // error/malfunction for that driver, so those numbers were just manual test
+  // input, not a real correction. Auto-submitting an unverified value here would
+  // write incorrect data into an official DOT compliance record. Decided with the
+  // user (2026-07-15): leave unimplemented until a real anomaly case is captured.
 };

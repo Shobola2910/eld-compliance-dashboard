@@ -45,7 +45,6 @@ export interface RawViolationRecord {
 }
 
 export interface CertifyResult {
-  providerLogId: string;
   success: boolean;
   certifiedAt?: string;
   errorMessage?: string;
@@ -86,7 +85,16 @@ export interface EldAdapter {
     credentials: ProviderCredentials,
     providerDriverId: string,
     opts: TimeWindowPageOpts
-  ): Promise<{ logs: RawLogRecord[]; nextCursor: string | null }>;
+  ): Promise<{
+    logs: RawLogRecord[];
+    nextCursor: string | null;
+    // Some providers only expose current trailer#/shipping-docs (and when they
+    // last changed) via the same event-history payload used for logs, not via
+    // listDrivers -- an optional side channel so the pipeline can enrich the
+    // driver row without a second API call. Providers that already return
+    // these on RawDriverRecord from listDrivers can just omit this.
+    driverMeta?: { trailerNumber?: string | null; shippingDocsUpdatedAt?: string | null };
+  }>;
 
   listViolations(
     credentials: ProviderCredentials,
@@ -94,5 +102,14 @@ export interface EldAdapter {
     opts: TimeWindowPageOpts
   ): Promise<{ violations: RawViolationRecord[]; nextCursor: string | null }>;
 
-  certifyLogs(credentials: ProviderCredentials, providerLogIds: string[]): Promise<CertifyResult[]>;
+  // Providers differ on whether "certify" targets specific log ids or a
+  // driver+date-range (Factor ELD's real bulk-certification endpoint is the
+  // latter -- it has no concept of certifying an individual log id).
+  // Modeling it as driver+range covers both: a range-less provider can just
+  // certify every log whose startedAt falls in [since, until] on its side.
+  certifyLogs(
+    credentials: ProviderCredentials,
+    providerDriverId: string,
+    opts: { since: Date; until: Date }
+  ): Promise<CertifyResult>;
 }
