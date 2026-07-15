@@ -27,7 +27,7 @@ async function buildPanel(provider: Provider): Promise<ProviderPanel> {
             <h1 className="text-lg font-semibold text-slate-100">{PROVIDER_LABELS[provider]} drivers</h1>
             <p className="mt-1 text-sm text-slate-400">Synced automatically from your {PROVIDER_LABELS[provider]} token.</p>
           </div>
-          <LogoutProviderButton provider={provider} label={PROVIDER_LABELS[provider]} />
+          <LogoutProviderButton provider={provider} />
         </div>
         <ProviderDriverTable provider={provider} />
       </>
