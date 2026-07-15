@@ -1,0 +1,12 @@
+{
+  "name": "network-capture",
+  "private": true,
+  "type": "module",
+  "description": "Standalone dev tool: opens a real Chrome window so you can log into an ELD provider yourself and click around, logging every API call to capture-log.jsonl. Not part of the main app -- run from inside this folder only.",
+  "scripts": {
+    "capture": "node capture.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
