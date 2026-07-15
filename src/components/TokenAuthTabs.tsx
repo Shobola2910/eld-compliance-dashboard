@@ -31,7 +31,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const needsTenantId = PROVIDERS_NEEDING_TENANT_ID.includes(provider);
+  const needsTenantId = PROVIDERS_NEEDING_TENANT_ID.includes(provider) && !status?.hasTenantId;
 
   useEffect(() => {
     fetch(`/api/tokens/${provider}`)
@@ -79,6 +79,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
         <div className="mt-4 rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">
           {status.isValid ? "Token saved" : "Token saved but marked invalid"}
           {status.lastValidatedAt && ` — last validated ${new Date(status.lastValidatedAt).toLocaleString()}`}
+          {status.hasTenantId && " · Tenant ID remembered"}
         </div>
       )}
 

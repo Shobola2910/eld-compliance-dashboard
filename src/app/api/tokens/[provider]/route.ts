@@ -34,7 +34,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { token, tenantId, tokenVersion } = parsed.data;
+  const { token, tenantId: newTenantId, tokenVersion } = parsed.data;
+
+  // Once a tenant_id has been saved once, never ask for it again -- reuse the
+  // stored value on every later token update unless a new one is explicitly given.
+  const [existing] = await db.select().from(providerTokens).where(eq(providerTokens.provider, provider));
+  const tenantId = newTenantId ?? existing?.tenantId ?? undefined;
 
   const adapter = getAdapter(provider);
   const validation = await adapter.validateToken({ token, tenantId }).catch((err) => ({
@@ -77,7 +82,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Unknown provider" }, { status: 404 });
   }
 
-  await db.delete(providerTokens).where(eq(providerTokens.provider, provider));
+  // Mark invalid rather than deleting the row -- this keeps the saved tenant_id
+  // (and any other per-account fields) around so reconnecting later never asks for it again.
+  await db.update(providerTokens).set({ isValid: false, updatedAt: new Date() }).where(eq(providerTokens.provider, provider));
 
   return NextResponse.json({ ok: true });
 }
