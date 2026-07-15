@@ -38,10 +38,10 @@ export default function ProviderTabSlider({
 
   return (
     <div>
-      <div className="relative inline-flex rounded-full border border-slate-800 bg-[#0d1117] p-1">
+      <div className="relative inline-flex rounded-full border border-violet-500/20 bg-[#0d1117] p-1">
         {indicatorStyle && (
           <div
-            className="absolute inset-y-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 shadow transition-all duration-300 ease-out"
+            className="absolute inset-y-1 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 shadow-[0_0_16px_-2px_rgba(168,85,247,0.7)] transition-all duration-300 ease-out"
             style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
           />
         )}
