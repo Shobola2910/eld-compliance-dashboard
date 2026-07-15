@@ -20,10 +20,14 @@ const DUTY_STATUS_MAPS: Record<Provider, Record<string, NormalizedDutyStatus>> =
     SLEEPER: "sleeper_berth",
   },
   factor: {
-    D: "driving",
-    ON: "on_duty",
-    OFF: "off_duty",
-    SB: "sleeper_berth",
+    // "DS_D" confirmed real (from /api/v1/hos/system-list's current_status field).
+    // The other three follow the same "DS_" prefix pattern but aren't confirmed yet --
+    // unmatched codes fall back to "off_duty" via the default below, so a wrong guess
+    // here just means a driver shows as off-duty instead of throwing.
+    DS_D: "driving",
+    DS_ON: "on_duty",
+    DS_OFF: "off_duty",
+    DS_SB: "sleeper_berth",
   },
   nexus: {
     driving: "driving",
@@ -42,10 +46,13 @@ const VIOLATION_TYPE_MAPS: Record<Provider, Record<string, NormalizedViolationTy
     UNIDENTIFIED_DRIVING: "unidentified_driving",
   },
   factor: {
-    "11H": "drive_time",
-    "14H": "duty_time",
-    "30MIN": "break_required",
-    "70H": "cycle_limit",
+    // "DRIVING_TIME_EXCEEDED" confirmed real (from the same system-list response's
+    // per-driver violations array). The rest are educated guesses following the same
+    // naming convention -- unmatched types fall back to "other" below, not an error.
+    DRIVING_TIME_EXCEEDED: "drive_time",
+    DUTY_TIME_EXCEEDED: "duty_time",
+    BREAK_REQUIRED: "break_required",
+    CYCLE_LIMIT_EXCEEDED: "cycle_limit",
   },
   nexus: {
     "hos.drive_time": "drive_time",

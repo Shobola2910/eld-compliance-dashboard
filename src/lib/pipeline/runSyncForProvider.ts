@@ -211,6 +211,7 @@ async function syncOneDriver(args: {
 
   const previousStatus: ConnectionStatus = existingDriver?.connectionStatus ?? "unknown";
   const newStatus = rawDriver.connectionStatus;
+  const liveDutyStatus = rawDriver.liveDutyStatus ? normalizeDutyStatus(provider, rawDriver.liveDutyStatus) : null;
 
   const [driver] = await db
     .insert(drivers)
@@ -224,6 +225,11 @@ async function syncOneDriver(args: {
       shippingDocsUpdatedAt: rawDriver.shippingDocsUpdatedAt ? new Date(rawDriver.shippingDocsUpdatedAt) : null,
       connectionStatus: newStatus,
       lastSeenAt: rawDriver.lastSeenAt ? new Date(rawDriver.lastSeenAt) : null,
+      liveDutyStatus,
+      liveBreakRemainingMs: rawDriver.liveHos?.breakRemainingMs,
+      liveDriveRemainingMs: rawDriver.liveHos?.driveRemainingMs,
+      liveShiftRemainingMs: rawDriver.liveHos?.shiftRemainingMs,
+      liveCycleRemainingMs: rawDriver.liveHos?.cycleRemainingMs,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -235,6 +241,11 @@ async function syncOneDriver(args: {
         shippingDocsUpdatedAt: rawDriver.shippingDocsUpdatedAt ? new Date(rawDriver.shippingDocsUpdatedAt) : null,
         connectionStatus: newStatus,
         lastSeenAt: rawDriver.lastSeenAt ? new Date(rawDriver.lastSeenAt) : null,
+        liveDutyStatus,
+        liveBreakRemainingMs: rawDriver.liveHos?.breakRemainingMs,
+        liveDriveRemainingMs: rawDriver.liveHos?.driveRemainingMs,
+        liveShiftRemainingMs: rawDriver.liveHos?.shiftRemainingMs,
+        liveCycleRemainingMs: rawDriver.liveHos?.cycleRemainingMs,
         updatedAt: new Date(),
       },
     })

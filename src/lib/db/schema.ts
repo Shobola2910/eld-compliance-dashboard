@@ -98,6 +98,14 @@ export const drivers = pgTable("drivers", {
   profileLastCheckedAt: timestamp("profile_last_checked_at", { withTimezone: true }),
   connectionStatus: connectionStatusEnum("connection_status").default("unknown").notNull(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  // Populated only for providers whose API hands back a live HOS snapshot
+  // directly (e.g. Factor ELD's system-list endpoint) -- preferred over our
+  // own computeHosStatus()-from-logs when present.
+  liveDutyStatus: text("live_duty_status"),
+  liveBreakRemainingMs: integer("live_break_remaining_ms"),
+  liveDriveRemainingMs: integer("live_drive_remaining_ms"),
+  liveShiftRemainingMs: integer("live_shift_remaining_ms"),
+  liveCycleRemainingMs: integer("live_cycle_remaining_ms"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

@@ -9,6 +9,18 @@ export interface RawDriverRecord {
   connectionStatus: "connected" | "disconnected" | "unknown";
   lastSeenAt: string | null; // ISO timestamp
   raw: unknown;
+  // Some providers (e.g. Factor ELD) hand back a live current-status +
+  // remaining-HOS-time snapshot directly from their own system, computed
+  // more authoritatively than we could from raw logs alone (especially
+  // before we have listLogs history for that provider). When present, the
+  // UI/pipeline should prefer this over our own computeHosStatus().
+  liveDutyStatus?: string; // provider vocabulary, normalized before storage
+  liveHos?: {
+    breakRemainingMs: number;
+    driveRemainingMs: number;
+    shiftRemainingMs: number;
+    cycleRemainingMs: number;
+  };
 }
 
 export interface RawLogRecord {

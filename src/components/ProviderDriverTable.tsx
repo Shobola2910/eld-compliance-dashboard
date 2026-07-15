@@ -3,7 +3,15 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { drivers, companies, violations, normalizedLogs } from "@/lib/db/schema";
 import { isProfileStale } from "@/lib/pipeline/stale-profile";
-import { computeHosStatus, formatDuration, formatRelativeTime, CYCLE_LOOKBACK_MS, type DutySegment } from "@/lib/pipeline/hos-calculator";
+import {
+  computeHosStatus,
+  formatDuration,
+  formatRelativeTime,
+  CYCLE_LOOKBACK_MS,
+  type DutySegment,
+  type HosStatus,
+  type DutyStatus,
+} from "@/lib/pipeline/hos-calculator";
 import type { Provider } from "@/lib/providers/types";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import ProviderIcon from "@/components/ProviderIcon";
@@ -19,6 +27,40 @@ const DUTY_STATUS_LABELS: Record<string, string> = {
   sleeper_berth: "Sleeper",
   unknown: "Unknown",
 };
+
+// Prefer a provider-supplied live HOS snapshot (e.g. Factor ELD's system-list
+// gives current status + remaining Break/Drive/Shift/Cycle directly) over our
+// own computeHosStatus()-from-logs, which is only as good as the log history
+// we've actually synced (empty/full-limits for a provider whose listLogs
+// isn't implemented yet).
+function resolveHosStatus(
+  driver: {
+    id: string;
+    liveDutyStatus: string | null;
+    liveBreakRemainingMs: number | null;
+    liveDriveRemainingMs: number | null;
+    liveShiftRemainingMs: number | null;
+    liveCycleRemainingMs: number | null;
+  },
+  logsByDriver: Map<string, DutySegment[]>,
+  now: Date
+): HosStatus {
+  if (
+    driver.liveBreakRemainingMs != null &&
+    driver.liveDriveRemainingMs != null &&
+    driver.liveShiftRemainingMs != null &&
+    driver.liveCycleRemainingMs != null
+  ) {
+    return {
+      currentDutyStatus: (driver.liveDutyStatus as DutyStatus | null) ?? "unknown",
+      breakRemainingMs: driver.liveBreakRemainingMs,
+      driveRemainingMs: driver.liveDriveRemainingMs,
+      shiftRemainingMs: driver.liveShiftRemainingMs,
+      cycleRemainingMs: driver.liveCycleRemainingMs,
+    };
+  }
+  return computeHosStatus(logsByDriver.get(driver.id) ?? [], now);
+}
 
 function CountdownBar({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
   const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
@@ -55,6 +97,11 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
         connectionStatus: drivers.connectionStatus,
         shippingDocsUpdatedAt: drivers.shippingDocsUpdatedAt,
         updatedAt: drivers.updatedAt,
+        liveDutyStatus: drivers.liveDutyStatus,
+        liveBreakRemainingMs: drivers.liveBreakRemainingMs,
+        liveDriveRemainingMs: drivers.liveDriveRemainingMs,
+        liveShiftRemainingMs: drivers.liveShiftRemainingMs,
+        liveCycleRemainingMs: drivers.liveCycleRemainingMs,
       })
       .from(drivers)
       .where(and(eq(drivers.provider, provider), eq(drivers.isActive, true)))
@@ -108,7 +155,7 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
     <div className="mt-6 space-y-6">
       {companyRows.map((company) => {
         const companyDrivers = driversByCompany.get(company.id) ?? [];
-        const hos = companyDrivers.map((d) => computeHosStatus(logsByDriver.get(d.id) ?? [], now));
+        const hos = companyDrivers.map((d) => resolveHosStatus(d, logsByDriver, now));
         const drivingCount = hos.filter((h) => h.currentDutyStatus === "driving").length;
 
         return (
