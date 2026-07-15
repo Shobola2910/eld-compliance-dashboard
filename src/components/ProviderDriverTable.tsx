@@ -8,6 +8,7 @@ import type { Provider } from "@/lib/providers/types";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import ProviderIcon from "@/components/ProviderIcon";
 import CheckCompanyButton from "@/components/CheckCompanyButton";
+import { buildExternalDriverUrl } from "@/lib/providers/externalLinks";
 
 const VIOLATIONS_WINDOW_DAYS = 9;
 
@@ -39,7 +40,7 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
 
   const [companyRows, driverRows, logRows, violationCounts] = await Promise.all([
     db
-      .select({ id: companies.id, name: companies.name })
+      .select({ id: companies.id, name: companies.name, providerCompanyId: companies.providerCompanyId })
       .from(companies)
       .where(and(eq(companies.provider, provider), eq(companies.isActive, true)))
       .orderBy(companies.name),
@@ -47,6 +48,7 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
       .select({
         id: drivers.id,
         companyId: drivers.companyId,
+        providerDriverId: drivers.providerDriverId,
         name: drivers.name,
         truckNumber: drivers.truckNumber,
         trailerNumber: drivers.trailerNumber,
@@ -148,6 +150,12 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
                       const stale = isProfileStale(driver.shippingDocsUpdatedAt, now);
                       const segments = logsByDriver.get(driver.id) ?? [];
                       const lastChangeAt = segments.length > 0 ? segments[segments.length - 1].startedAt : null;
+                      const externalUrl = buildExternalDriverUrl(provider, {
+                        providerCompanyId: company.providerCompanyId,
+                        providerDriverId: driver.providerDriverId,
+                        name: driver.name,
+                        truckNumber: driver.truckNumber,
+                      });
 
                       return (
                         <tr key={driver.id} className="bg-[#111623] hover:bg-[#151b2b]">
@@ -161,13 +169,27 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <Link
-                              href={`/drivers/${driver.id}`}
-                              className="flex items-center gap-2 font-medium text-blue-400 hover:underline"
-                            >
-                              <ProviderIcon provider={provider} size="sm" />
-                              {driver.name}
-                            </Link>
+                            {externalUrl ? (
+                              <a
+                                href={externalUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Open ${driver.name}'s log on the real ${provider} platform`}
+                                className="flex items-center gap-2 font-medium text-blue-400 hover:underline"
+                              >
+                                <ProviderIcon provider={provider} size="sm" />
+                                {driver.name}
+                                <span className="text-xs text-slate-500">↗</span>
+                              </a>
+                            ) : (
+                              <Link
+                                href={`/drivers/${driver.id}`}
+                                className="flex items-center gap-2 font-medium text-blue-400 hover:underline"
+                              >
+                                <ProviderIcon provider={provider} size="sm" />
+                                {driver.name}
+                              </Link>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-slate-300">{driver.truckNumber ?? "—"}</td>
                           <td className="px-4 py-3">
