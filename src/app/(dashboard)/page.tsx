@@ -6,6 +6,7 @@ import type { Provider } from "@/lib/providers/types";
 import ProviderTabSlider, { type ProviderPanel } from "@/components/ProviderTabSlider";
 import ProviderDriverTable from "@/components/ProviderDriverTable";
 import TokenAuthTabs from "@/components/TokenAuthTabs";
+import LogoutProviderButton from "@/components/LogoutProviderButton";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,13 @@ async function buildPanel(provider: Provider): Promise<ProviderPanel> {
     provider,
     content: isConnected ? (
       <>
-        <h1 className="text-lg font-semibold text-slate-100">{PROVIDER_LABELS[provider]} drivers</h1>
-        <p className="mt-1 text-sm text-slate-400">Synced automatically from your {PROVIDER_LABELS[provider]} token.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-100">{PROVIDER_LABELS[provider]} drivers</h1>
+            <p className="mt-1 text-sm text-slate-400">Synced automatically from your {PROVIDER_LABELS[provider]} token.</p>
+          </div>
+          <LogoutProviderButton provider={provider} label={PROVIDER_LABELS[provider]} />
+        </div>
         <ProviderDriverTable provider={provider} />
       </>
     ) : (

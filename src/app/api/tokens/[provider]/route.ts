@@ -70,6 +70,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
   return NextResponse.json({ ok: true });
 }
 
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
+  const { provider: providerParam } = await params;
+  const provider = parseProvider(providerParam);
+  if (!provider) {
+    return NextResponse.json({ error: "Unknown provider" }, { status: 404 });
+  }
+
+  await db.delete(providerTokens).where(eq(providerTokens.provider, provider));
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider: providerParam } = await params;
   const provider = parseProvider(providerParam);
