@@ -4,15 +4,6 @@ import { EldAdapter, PageOpts, TimeWindowPageOpts, ProviderCredentials, RawDrive
 // (app.factoreld.com): the frontend calls a separate API host, not its own domain.
 const API_BASE = "https://api.drivehos.app";
 
-interface FactorApiCompany {
-  id?: string | number;
-  companyId?: string | number;
-  dotNumber?: string | number;
-  name?: string;
-  companyName?: string;
-  [key: string]: unknown;
-}
-
 interface FactorApiViolation {
   id: string;
   driver_id: string;
@@ -25,6 +16,7 @@ interface FactorApiViolation {
 
 interface FactorApiDriver {
   company_id: string;
+  company_name: string;
   driver_id: string;
   driver_name: string;
   vehicle_number: string | null;
@@ -71,24 +63,6 @@ async function factorFetch(
   }
 
   return res.json();
-}
-
-// Best-effort: the request shape (GET /api/v1/companies?status=active&limit=N&page=1&group=all,
-// Bearer + tenant_id headers) is confirmed from a captured request, but the exact response JSON
-// field names were not visible in that capture (only headers were shown) -- this parses
-// defensively across a few likely shapes. Verify against a real response body and adjust field
-// names if this is off.
-function parseCompanyList(json: unknown): { providerCompanyId: string; name: string }[] {
-  const list: FactorApiCompany[] = Array.isArray(json)
-    ? json
-    : ((json as { data?: FactorApiCompany[]; companies?: FactorApiCompany[] })?.data ??
-       (json as { companies?: FactorApiCompany[] })?.companies ??
-       []);
-
-  return list.map((c) => ({
-    providerCompanyId: String(c.id ?? c.companyId ?? c.dotNumber ?? ""),
-    name: c.name ?? c.companyName ?? "Unknown company",
-  }));
 }
 
 // Confirmed real via DevTools: GET /api/v1/hos/system-list returns EVERY driver across
@@ -186,13 +160,19 @@ export const factorEldAdapter: EldAdapter = {
   },
 
   async listCompanies(credentials: ProviderCredentials) {
-    const json = await factorFetch(credentials, "/api/v1/companies", {
-      status: "active",
-      limit: "200",
-      page: "1",
-      group: "all",
-    });
-    return parseCompanyList(json);
+    // Derived from the confirmed-working system-list response (every driver carries its
+    // own company_id/company_name) instead of /api/v1/companies -- we've never actually
+    // seen that endpoint's response body (only its request headers), so parseCompanyList's
+    // guessed field names risked extracting the wrong/empty providerCompanyId, which would
+    // silently collapse every company into one row (same empty id -> same unique-index key)
+    // and explains companies/drivers not "all coming through". Sourcing from system-list
+    // guarantees the ids match exactly what listDrivers/listViolations filter on.
+    const all = await fetchSystemList(credentials);
+    const byId = new Map<string, string>();
+    for (const d of all) {
+      if (!byId.has(d.company_id)) byId.set(d.company_id, d.company_name);
+    }
+    return Array.from(byId.entries()).map(([providerCompanyId, name]) => ({ providerCompanyId, name }));
   },
 
   async listDrivers(credentials: ProviderCredentials, providerCompanyId: string, _opts: PageOpts) {
