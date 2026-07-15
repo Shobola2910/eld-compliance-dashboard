@@ -85,6 +85,45 @@ export async function runSyncForProvider(provider: Provider): Promise<ProviderSy
   return { provider, status, companies: results };
 }
 
+// Re-sync a single already-discovered company on demand (e.g. the "Check" button
+// next to a company's driver list), without re-running listCompanies for the
+// whole provider.
+export async function runSyncForCompany(companyId: string): Promise<CompanySyncResult> {
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+  if (!company) {
+    return { companyId, companyName: "Unknown", provider: "leader", status: "failed", driversProcessed: 0, errorMessage: "Company not found" };
+  }
+
+  const [tokenRow] = await db.select().from(providerTokens).where(eq(providerTokens.provider, company.provider));
+  if (!tokenRow || !tokenRow.isValid) {
+    return {
+      companyId,
+      companyName: company.name,
+      provider: company.provider,
+      status: "failed",
+      driversProcessed: 0,
+      errorMessage: "No valid token saved for this provider",
+    };
+  }
+
+  let credentials: ProviderCredentials;
+  try {
+    credentials = { token: decryptToken(tokenRow), tenantId: tokenRow.tenantId ?? undefined };
+  } catch (err) {
+    return {
+      companyId,
+      companyName: company.name,
+      provider: company.provider,
+      status: "failed",
+      driversProcessed: 0,
+      errorMessage: `Token decryption failed: ${(err as Error).message}`,
+    };
+  }
+
+  const adapter = getAdapter(company.provider);
+  return syncOneCompany(company.id, company.name, company.provider, adapter, credentials);
+}
+
 async function syncOneCompany(
   companyId: string,
   companyName: string,
