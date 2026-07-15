@@ -14,6 +14,14 @@ interface FactorApiViolation {
   [key: string]: unknown;
 }
 
+interface FactorApiCompany {
+  id: number;
+  company_id: string;
+  company_name: string;
+  active_driver: number;
+  [key: string]: unknown;
+}
+
 interface FactorApiDriver {
   company_id: string;
   company_name: string;
@@ -160,19 +168,35 @@ export const factorEldAdapter: EldAdapter = {
   },
 
   async listCompanies(credentials: ProviderCredentials) {
-    // Derived from the confirmed-working system-list response (every driver carries its
-    // own company_id/company_name) instead of /api/v1/companies -- we've never actually
-    // seen that endpoint's response body (only its request headers), so parseCompanyList's
-    // guessed field names risked extracting the wrong/empty providerCompanyId, which would
-    // silently collapse every company into one row (same empty id -> same unique-index key)
-    // and explains companies/drivers not "all coming through". Sourcing from system-list
-    // guarantees the ids match exactly what listDrivers/listViolations filter on.
-    const all = await fetchSystemList(credentials);
-    const byId = new Map<string, string>();
-    for (const d of all) {
-      if (!byId.has(d.company_id)) byId.set(d.company_id, d.company_name);
-    }
-    return Array.from(byId.entries()).map(([providerCompanyId, name]) => ({ providerCompanyId, name }));
+    // Now confirmed real (previously guessed field names extracted an empty
+    // providerCompanyId for every company, which is why companies/drivers weren't "all
+    // coming through" -- they collided onto one row). Real shape:
+    // { data: { companies: [{ id: <numeric internal id>, company_id: <uuid>, company_name, ... }], paging } }.
+    // company_id (the UUID) is what listDrivers/listViolations's system-list rows use too --
+    // NOT the numeric `id` field, which is a different internal identifier.
+    // Paginated at a small page size (the real frontend uses 20) across potentially many
+    // pages (101 companies / 6 pages seen for this account) -- page through all of them,
+    // including companies with zero active drivers (system-list alone would have missed those).
+    const all: { providerCompanyId: string; name: string }[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const json = await factorFetch(credentials, "/api/v1/companies", {
+        status: "active",
+        limit: "100",
+        page: String(page),
+        group: "all",
+      });
+      const data = (json as { data?: { companies?: FactorApiCompany[]; paging?: { totalPages?: number } } })?.data;
+      for (const c of data?.companies ?? []) {
+        all.push({ providerCompanyId: c.company_id, name: c.company_name });
+      }
+      totalPages = data?.paging?.totalPages ?? 1;
+      page += 1;
+    } while (page <= totalPages);
+
+    return all;
   },
 
   async listDrivers(credentials: ProviderCredentials, providerCompanyId: string, _opts: PageOpts) {
