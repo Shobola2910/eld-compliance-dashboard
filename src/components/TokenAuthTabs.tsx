@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProviderIcon from "@/components/ProviderIcon";
+import { formatEdt } from "@/lib/format-time";
 
 interface Props {
   provider: "leader" | "factor" | "nexus";
@@ -78,7 +79,7 @@ export default function TokenAuthTabs({ provider, label }: Props) {
       {status?.saved && (
         <div className="mt-4 rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">
           {status.isValid ? "Token saved" : "Token saved but marked invalid"}
-          {status.lastValidatedAt && ` — last validated ${new Date(status.lastValidatedAt).toLocaleString()}`}
+          {status.lastValidatedAt && ` — last validated ${formatEdt(status.lastValidatedAt)}`}
           {status.hasTenantId && " · Tenant ID remembered"}
         </div>
       )}

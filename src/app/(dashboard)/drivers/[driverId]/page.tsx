@@ -6,6 +6,7 @@ import { drivers, companies, normalizedLogs, violations, connectionEvents } from
 import { isProfileStale } from "@/lib/pipeline/stale-profile";
 import { PROVIDER_LABELS } from "@/lib/providers/registry";
 import ConnectionBadge from "@/components/ConnectionBadge";
+import { formatEdt } from "@/lib/format-time";
 
 export const dynamic = "force-dynamic";
 
@@ -74,13 +75,11 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ d
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">Last seen</dt>
-            <dd className="text-slate-200">{driver.lastSeenAt ? new Date(driver.lastSeenAt).toLocaleString() : "—"}</dd>
+            <dd className="text-slate-200">{formatEdt(driver.lastSeenAt)}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">Shipping docs updated</dt>
-            <dd className="text-slate-200">
-              {driver.shippingDocsUpdatedAt ? new Date(driver.shippingDocsUpdatedAt).toLocaleString() : "—"}
-            </dd>
+            <dd className="text-slate-200">{formatEdt(driver.shippingDocsUpdatedAt)}</dd>
           </div>
         </dl>
       </div>
@@ -104,7 +103,7 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ d
                 {driverViolations.map((v) => (
                   <tr key={v.id} className="bg-[#111623]">
                     <td className="px-4 py-2 text-slate-200">{v.type.replace(/_/g, " ")}</td>
-                    <td className="px-4 py-2 text-slate-300">{new Date(v.occurredAt).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-slate-300">{formatEdt(v.occurredAt)}</td>
                     <td className="px-4 py-2">
                       {v.resolvedAt ? (
                         <span className="text-emerald-400">Resolved</span>
@@ -140,8 +139,8 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ d
                 {logs.map((log) => (
                   <tr key={log.id} className="bg-[#111623]">
                     <td className="px-4 py-2 text-slate-200">{log.dutyStatus.replace(/_/g, " ")}</td>
-                    <td className="px-4 py-2 text-slate-300">{new Date(log.startedAt).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-slate-300">{log.endedAt ? new Date(log.endedAt).toLocaleString() : "in progress"}</td>
+                    <td className="px-4 py-2 text-slate-300">{formatEdt(log.startedAt)}</td>
+                    <td className="px-4 py-2 text-slate-300">{log.endedAt ? formatEdt(log.endedAt) : "in progress"}</td>
                     <td className="px-4 py-2 text-slate-400">{log.certifyStatus.replace(/_/g, " ")}</td>
                   </tr>
                 ))}
@@ -160,7 +159,7 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ d
             {events.map((event) => (
               <li key={event.id} className="flex items-center gap-3 rounded-md border border-slate-800 bg-[#111623] px-3 py-2">
                 <ConnectionBadge status={event.status} />
-                <span className="text-slate-400">{new Date(event.occurredAt).toLocaleString()}</span>
+                <span className="text-slate-400">{formatEdt(event.occurredAt)}</span>
               </li>
             ))}
           </ul>

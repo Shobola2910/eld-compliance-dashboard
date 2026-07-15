@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { alerts, drivers, companies } from "@/lib/db/schema";
 import AcknowledgeButton from "@/components/AcknowledgeButton";
+import { formatEdt } from "@/lib/format-time";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export default async function AlertsPage() {
                     )}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {alert.companyName} — {new Date(alert.triggeredAt).toLocaleString()}
+                    {alert.companyName} — {formatEdt(alert.triggeredAt)}
                   </p>
                 </div>
               </div>

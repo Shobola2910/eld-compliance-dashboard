@@ -1,9 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { PROVIDERS, PROVIDER_LABELS } from "@/lib/providers/registry";
 import type { Provider } from "@/lib/providers/types";
 import ProviderIcon from "@/components/ProviderIcon";
+
+const AUTO_CHECK_INTERVAL_MS = 30_000;
 
 export interface ProviderPanel {
   provider: Provider;
@@ -17,6 +20,7 @@ export default function ProviderTabSlider({
   initialProvider: Provider;
   panels: ProviderPanel[];
 }) {
+  const router = useRouter();
   const [active, setActive] = useState<Provider>(initialProvider);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
@@ -27,6 +31,18 @@ export default function ProviderTabSlider({
       setIndicatorStyle({ left: el.offsetLeft, width: el.offsetWidth });
     }
   }, [active]);
+
+  // Keep whichever provider tab is currently open live -- re-check it against
+  // the real API every 30s (same action as the "Check" button) rather than
+  // waiting for the 15-minute GitHub Actions cron.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`/api/sync/provider/${active}`, { method: "POST" })
+        .then(() => router.refresh())
+        .catch(() => {});
+    }, AUTO_CHECK_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [active, router]);
 
   function select(provider: Provider) {
     if (provider === active) return;
