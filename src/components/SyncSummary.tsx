@@ -18,22 +18,24 @@ export default function SyncSummary({ summary }: { summary: ProviderSyncSummary 
           {summary.succeeded} / {summary.totalCompanies} muvaffaqiyatli
         </span>
         {summary.notSucceeded.length > 0 && (
-          <span className="font-medium text-amber-400">{summary.notSucceeded.length} qo&apos;yilmadi</span>
+          <details className="group">
+            <summary className="cursor-pointer list-none font-medium text-amber-400 hover:text-amber-300">
+              {summary.notSucceeded.length} qo&apos;yilmadi
+              <span className="ml-1 text-xs text-slate-500 group-open:hidden">(ko&apos;rish uchun bosing)</span>
+            </summary>
+            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs">
+              {summary.notSucceeded.map((c) => (
+                <li key={c.companyId} className="flex flex-wrap items-baseline gap-1.5">
+                  <span className="text-slate-200">{c.companyName}</span>
+                  <span className="text-slate-500">·</span>
+                  <span className="text-red-400">{STATUS_LABELS[c.status] ?? c.status}</span>
+                  {c.errorMessage && <span className="text-slate-400">— {c.errorMessage}</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </div>
-
-      {summary.notSucceeded.length > 0 && (
-        <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs">
-          {summary.notSucceeded.map((c) => (
-            <li key={c.companyId} className="flex flex-wrap items-baseline gap-1.5">
-              <span className="text-slate-200">{c.companyName}</span>
-              <span className="text-slate-500">·</span>
-              <span className="text-red-400">{STATUS_LABELS[c.status] ?? c.status}</span>
-              {c.errorMessage && <span className="text-slate-400">— {c.errorMessage}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
