@@ -290,7 +290,12 @@ export const factorEldAdapter: EldAdapter = {
       end_date: opts.until.toISOString(),
       timezone: "America/New_York",
     });
-    const events = (json as { data?: { events?: FactorApiEvent[] } })?.data?.events ?? [];
+    // Confirmed real-world case: at least some events come back with no
+    // event_start_time at all -- without this filter, sorting/comparing on it
+    // (here and in deriveDriverMeta) throws and drops the whole driver's sync.
+    const events = ((json as { data?: { events?: FactorApiEvent[] } })?.data?.events ?? []).filter(
+      (e) => typeof e.event_start_time === "string"
+    );
 
     const logs: RawLogRecord[] = events
       .filter((e) => DUTY_EVENT_CODES.has(e.event_code))
