@@ -7,6 +7,8 @@ import ProviderTabSlider, { type ProviderPanel } from "@/components/ProviderTabS
 import ProviderDriverTable from "@/components/ProviderDriverTable";
 import TokenAuthTabs from "@/components/TokenAuthTabs";
 import ProviderActionPanel from "@/components/ProviderActionPanel";
+import SyncSummary from "@/components/SyncSummary";
+import { getLatestSyncSummary } from "@/lib/pipeline/syncSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ function parseProvider(value: string | undefined): Provider {
 async function buildPanel(provider: Provider): Promise<ProviderPanel> {
   const [tokenRow] = await db.select().from(providerTokens).where(eq(providerTokens.provider, provider));
   const isConnected = !!tokenRow?.isValid;
+  const syncSummary = isConnected ? await getLatestSyncSummary(provider) : null;
 
   return {
     provider,
@@ -29,6 +32,7 @@ async function buildPanel(provider: Provider): Promise<ProviderPanel> {
           </div>
           <ProviderActionPanel provider={provider} />
         </div>
+        {syncSummary && <SyncSummary summary={syncSummary} />}
         <ProviderDriverTable provider={provider} />
       </>
     ) : (
