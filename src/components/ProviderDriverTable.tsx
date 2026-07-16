@@ -17,6 +17,7 @@ import ConnectionBadge from "@/components/ConnectionBadge";
 import ProviderIcon from "@/components/ProviderIcon";
 import CheckCompanyButton from "@/components/CheckCompanyButton";
 import { buildExternalDriverUrl } from "@/lib/providers/externalLinks";
+import CompanySortableList, { type CompanySection } from "@/components/CompanySortableList";
 
 const VIOLATIONS_WINDOW_DAYS = 9;
 
@@ -82,7 +83,12 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
 
   const [companyRows, driverRows, logRows, violationCounts] = await Promise.all([
     db
-      .select({ id: companies.id, name: companies.name, providerCompanyId: companies.providerCompanyId })
+      .select({
+        id: companies.id,
+        name: companies.name,
+        providerCompanyId: companies.providerCompanyId,
+        createdAt: companies.createdAt,
+      })
       .from(companies)
       .where(and(eq(companies.provider, provider), eq(companies.isActive, true)))
       .orderBy(companies.name),
@@ -151,15 +157,13 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
     driversByCompany.set(driver.companyId, list);
   }
 
-  return (
-    <div className="mt-6 space-y-6">
-      {companyRows.map((company) => {
-        const companyDrivers = driversByCompany.get(company.id) ?? [];
-        const hos = companyDrivers.map((d) => resolveHosStatus(d, logsByDriver, now));
-        const drivingCount = hos.filter((h) => h.currentDutyStatus === "driving").length;
+  const sections: CompanySection[] = companyRows.map((company) => {
+    const companyDrivers = driversByCompany.get(company.id) ?? [];
+    const hos = companyDrivers.map((d) => resolveHosStatus(d, logsByDriver, now));
+    const drivingCount = hos.filter((h) => h.currentDutyStatus === "driving").length;
 
-        return (
-          <section key={company.id} className="overflow-hidden rounded-lg border border-slate-800">
+    const element = (
+      <section key={company.id} className="overflow-hidden rounded-lg border border-slate-800">
             <div className="flex items-center justify-between bg-[#0d1117] px-4 py-3">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100">{company.name}</h3>
@@ -281,9 +285,15 @@ export default async function ProviderDriverTable({ provider }: { provider: Prov
                 </table>
               </div>
             )}
-          </section>
-        );
-      })}
+      </section>
+    );
+
+    return { id: company.id, name: company.name, createdAt: company.createdAt.toISOString(), element };
+  });
+
+  return (
+    <div className="mt-6">
+      <CompanySortableList sections={sections} />
     </div>
   );
 }
